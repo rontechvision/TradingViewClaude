@@ -114,7 +114,7 @@ def main():
             f"OOS PF={_pf_str(wf['oos_metrics'].profit_factor)}  "
             f"IS SR={wf['is_metrics'].sharpe_ratio:.2f}  "
             f"OOS SR={wf['oos_metrics'].sharpe_ratio:.2f}  "
-            f"→ {status}  params={params}"
+            f"-> {status}  params={params}"
         )
 
     # ── Print results table ────────────────────────────────────────────────
