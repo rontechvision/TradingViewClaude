@@ -8,17 +8,16 @@ A Python system that fetches OHLCV market data, translates PineScript strategies
 # Install dependencies
 pip install -r requirements.txt
 
-# Fetch market data (saves to data/csv/)
-python scripts/fetch_data.py --symbol BTCUSDT --interval 1h --start 2022-01-01 --end 2024-01-01
+# Fetch market data (saves to data/csv/ — all 3 intervals: 1h, 4h, 1d)
+# Defaults: BTC-USD, last 6 months to today
+python scripts/fetch_data.py --symbol BTC-USD
+python scripts/fetch_data.py --symbol BTC-USD --start 2024-01-01 --end 2026-04-18
 
 # Run backtest on a strategy
-python scripts/run_backtest.py --symbol BTCUSDT --strategy supertrend --data data/csv/BTCUSDT_1h.csv
+python scripts/run_backtest.py --strategy supertrend --data data/csv/BTC-USD_1h_2025-10-18_2026-04-18.csv
 
-# Optimize strategy parameters
-python scripts/optimize.py --symbol BTCUSDT --strategy supertrend --data data/csv/BTCUSDT_1h.csv
-
-# Run all backtests
-python scripts/run_all.py
+# Optimize strategy parameters (grid search + walk-forward validation)
+python scripts/optimize.py --strategy supertrend --data data/csv/BTC-USD_1h_2025-10-18_2026-04-18.csv
 ```
 
 ## Architecture
@@ -26,37 +25,42 @@ python scripts/run_all.py
 ```
 src/
   data/
-    fetcher.py      — API calls (ccxt for crypto, yfinance for stocks)
+    fetcher.py      — yfinance API calls; 4h resampled from 1h; absolute DATA_DIR
     loader.py       — load/validate CSV files into DataFrames
   strategies/
     base.py         — BaseStrategy ABC with signal generation interface
-    supertrend.py   — RK Supertrend Pro v2 translated from PineScript
+    supertrend.py   — Regression Slope Oscillator translated from RK_Supertrend_Pro_v2.pine
   backtest/
     engine.py       — event-driven backtest loop (no look-ahead bias)
     metrics.py      — PnL, Sharpe, max drawdown, win rate, profit factor
-    report.py       — save results to results/ as JSON + CSV
   optimizer/
-    grid_search.py  — exhaustive grid search over parameter space
-    walk_forward.py — walk-forward validation to avoid overfitting
+    grid_search.py  — exhaustive grid search over parameter space (IS split only)
+    walk_forward.py — single IS/OOS holdout split to detect overfitting
 
-data/csv/           — raw OHLCV files: {SYMBOL}_{INTERVAL}.csv
+data/csv/           — raw OHLCV files: {SYMBOL}_{INTERVAL}_{START}_{END}.csv
 results/            — backtest output JSON reports
 scripts/            — CLI entry points (thin wrappers around src/)
 ```
 
 ## Key Decisions
 
-- **ccxt** for crypto data (unified interface across exchanges, supports Binance/Bybit)
-- **yfinance** for stocks/ETFs/indices
+- **yfinance only** for all data (crypto via `BTC-USD` format, stocks/ETFs by ticker)
 - **No external backtest library** (Backtrader/vectorbt) — custom engine gives exact PineScript parity (bar-by-bar, not vectorized) and avoids look-ahead bias
 - **CSV as data layer** — avoid re-fetching; versioned by symbol + interval + date range in filename
 - **Walk-forward validation** mandatory before claiming a strategy "works" — in-sample optimization + out-of-sample verification
+- **4h interval** has no native yfinance support — fetched as 1h and resampled
 
 ## Data File Convention
 
 `data/csv/{SYMBOL}_{INTERVAL}_{START}_{END}.csv`
 
 Columns: `timestamp,open,high,low,close,volume` (Unix ms timestamp)
+
+## fetch_data.py Behavior
+
+- Always fetches all three intervals in one run: `1h`, `4h`, `1d`
+- For intraday (1h/4h), `end` date is advanced by +1 day internally so today's bars are included
+- Daily (`1d`) end is not advanced — partial-day bar is not emitted by Yahoo Finance
 
 ## Strategy Translation Rules (PineScript → Python)
 
@@ -75,6 +79,7 @@ Columns: `timestamp,open,high,low,close,volume` (Unix ms timestamp)
 - **Sharpe Ratio**: risk-adjusted return — target > 1.0
 - **Max Drawdown**: worst peak-to-trough loss — monitor closely
 - **Walk-forward**: split data into IS (in-sample optimize) + OOS (out-of-sample verify) windows
+- **Overfitting filter**: candidate passes if OOS PF ≥ 1.2 AND IS PF < 3.0
 
 ## Workflow
 
@@ -82,7 +87,7 @@ Columns: `timestamp,open,high,low,close,volume` (Unix ms timestamp)
 - After fetching data, inspect CSV head/tail before running backtest
 - When optimizing, always reserve last 20% of data as OOS holdout
 - Run typecheck after changes: `mypy src/`
-- Preferred exchange for crypto: **Binance** (highest liquidity, most history)
+- Preferred symbol format for crypto: `BTC-USD` (yfinance Yahoo Finance format)
 
 ## Don'ts
 
@@ -90,3 +95,4 @@ Columns: `timestamp,open,high,low,close,volume` (Unix ms timestamp)
 - Don't vectorize the backtest loop — bar-by-bar is intentional
 - Don't commit raw API keys — use `.env` file (already in `.gitignore`)
 - Don't optimize on the full dataset — always hold out OOS data
+- Don't use ccxt — data layer is yfinance only
