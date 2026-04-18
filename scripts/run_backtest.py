@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 """Run a backtest for a strategy against a CSV data file."""
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import argparse
 import importlib
 from src.data.loader import load_csv

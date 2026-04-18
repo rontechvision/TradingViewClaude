@@ -4,7 +4,7 @@ import pandas as pd
 from datetime import datetime
 from pathlib import Path
 
-DATA_DIR = Path("data/csv")
+DATA_DIR = Path(__file__).resolve().parents[2] / "data" / "csv"
 
 
 def fetch_crypto(symbol: str, interval: str, start: str, end: str) -> pd.DataFrame:

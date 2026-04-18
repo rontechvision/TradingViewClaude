@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 """Fetch OHLCV data from Binance (crypto) or yfinance (stocks) and save to data/csv/."""
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import argparse
 from src.data.fetcher import fetch_crypto, fetch_stock, save_data
 
@@ -16,7 +20,7 @@ def main():
 
     is_crypto = any(args.symbol.upper().endswith(s) for s in CRYPTO_SUFFIXES)
     print(f"Fetching {'crypto' if is_crypto else 'stock'} data for {args.symbol} ({args.interval}) "
-          f"{args.start} → {args.end} ...")
+          f"{args.start} to {args.end} ...")
 
     df = fetch_crypto(args.symbol, args.interval, args.start, args.end) if is_crypto \
         else fetch_stock(args.symbol, args.interval, args.start, args.end)
@@ -24,7 +28,7 @@ def main():
     path = save_data(df, args.symbol, args.interval, args.start, args.end)
     print(f"Saved : {path}")
     print(f"Rows  : {len(df):,}")
-    print(f"Range : {df['timestamp'].iloc[0]} → {df['timestamp'].iloc[-1]}")
+    print(f"Range : {df['timestamp'].iloc[0]} to {df['timestamp'].iloc[-1]}")
 
 
 if __name__ == "__main__":
