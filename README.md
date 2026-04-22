@@ -36,4 +36,4 @@ Try to invest more equity per trade.
 Backtest your ideas and give me the best performing one.
 
 
-
+Improve Profit Factor by adding SL and TP
