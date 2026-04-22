@@ -14,10 +14,10 @@ python scripts/fetch_data.py --symbol BTC/USDT
 python scripts/fetch_data.py --symbol BTC/USDT ETH/USDT --start 2024-01-01 --end 2026-04-18
 
 # Run backtest on a strategy
-python scripts/run_backtest.py --strategy supertrend --data data/csv/BTC-USD_1h_2025-10-18_2026-04-18.csv
+python scripts/run_backtest.py --strategy supertrend --data data/BTCUSDT/BTCUSDT_1h_2025-10-22_2026-04-22.csv
 
 # Optimize strategy parameters (grid search + walk-forward validation)
-python scripts/optimize.py --strategy supertrend --data data/csv/BTC-USD_1h_2025-10-18_2026-04-18.csv
+python scripts/optimize.py --strategy supertrend --data data/BTCUSDT/BTCUSDT_1h_2025-10-22_2026-04-22.csv
 ```
 
 ## Architecture
