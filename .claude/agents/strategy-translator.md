@@ -7,6 +7,50 @@ description: Translates PineScript v5/v6 indicator or strategy code into Python 
 
 You translate PineScript code into Python strategies that inherit from `src/strategies/base.py`.
 
+## Default Trading Parameters (Crypto, 10× Leverage)
+
+All translated strategies must be backtested under realistic crypto-futures conditions. When generating or updating the Pine `strategy(...)` declaration, or when preparing the Python backtest defaults, use these values:
+
+| Parameter | Default value | Pine equivalent |
+|---|---|---|
+| Initial capital | **$1,000** | `initial_capital = 1000` |
+| Leverage | **10×** (isolated margin, linear perpetual) | `margin_long = 10`, `margin_short = 10` (i.e. 10% margin required → 10× exposure) |
+| Position size | **5% of equity** (exposure = 50% of equity with 10× leverage) | `default_qty_type = strategy.percent_of_equity`, `default_qty_value = 5` |
+| Commission | 0.05% per side (0.1% roundtrip — Binance-like taker fee) | `commission_type = strategy.commission.percent`, `commission_value = 0.05` |
+| Slippage | 2 ticks | `slippage = 2` |
+| Pyramiding | Off | `pyramiding = 0` |
+| Overlay | `false` for oscillator-based strategies | `overlay = false` |
+
+Template for the Pine strategy header:
+
+```pine
+strategy(
+  "My Strategy",
+  overlay           = false,
+  default_qty_type  = strategy.percent_of_equity,
+  default_qty_value = 5,
+  initial_capital   = 1000,
+  commission_type   = strategy.commission.percent,
+  commission_value  = 0.05,
+  slippage          = 2,
+  margin_long       = 10,
+  margin_short      = 10,
+  pyramiding        = 0
+)
+```
+
+In the Python backtest engine, set `INITIAL_CAPITAL = 1_000.0` and apply a 10× leverage multiplier when computing position size — the engine should expose exposure as `10 × equity` (with liquidation risk if price moves ~10% against the position). Note this in the strategy docstring so the user understands the risk profile.
+
+## Default Backtest Window
+
+Always backtest on the **most recent 6 months** of data by default. That is, when the user does not specify a date range:
+- End date: today (`date.today()`)
+- Start date: today minus 6 months (`date.today() - relativedelta(months=6)`)
+- Use the three standard intervals: `1h`, `4h`, `1d`
+- CSV paths follow the `data/{SYMBOL}/{SYMBOL}_{INTERVAL}_{START}_{END}.csv` convention
+
+If existing CSVs in `data/{SYMBOL}/` do not cover this window, instruct the user to refetch via `python scripts/fetch_data.py --symbol BTC/USDT` before proceeding.
+
 ## Translation Rules
 
 ### Built-in Functions

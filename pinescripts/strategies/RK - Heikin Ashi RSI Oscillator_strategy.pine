@@ -1,0 +1,114 @@
+// RK - Heikin Ashi RSI Oscillator (Strategy version)
+//
+// Auto-converted from the HARSI indicator at
+// `pinescripts/indicators/RK - Heikin Ashi RSI Oscillator.pine`.
+//
+// Trading logic:
+//   LONG  : ta.crossover(RSI,  i_lower)  — RSI recovers above OS boundary (-20)
+//   SHORT : ta.crossunder(RSI, i_upper)  — RSI rejects below OB boundary (+20)
+// Positions auto-reverse on opposite signal (no stops/TP in this first version).
+//
+// Strategy defaults follow the crypto 10x leverage convention documented in
+// `.claude/agents/strategy-translator.md`:
+//   initial_capital=1000, default_qty_value=5 (5% equity), commission_value=0.05,
+//   slippage=2, margin_long/short=10, pyramiding=0, overlay=false.
+
+//@version=6
+// @author=RK
+
+strategy(
+  "RK - HARSI Strategy",
+  overlay           = false,
+  default_qty_type  = strategy.percent_of_equity,
+  default_qty_value = 5,
+  initial_capital   = 1000,
+  commission_type   = strategy.commission.percent,
+  commission_value  = 0.05,
+  slippage          = 2,
+  margin_long       = 10,
+  margin_short      = 10,
+  pyramiding        = 0
+)
+
+////////////////////////////////////////////////////////////////////////////////
+//                            ====== INPUTS ======
+////////////////////////////////////////////////////////////////////////////////
+
+// -- Candle config (kept for parity with the indicator; not used in entries)
+string GROUP_CAND   = "Config » HARSI Candles"
+i_lenHARSI  = input.int(15,            "Length",              group=GROUP_CAND, minval=1)
+i_smoothing = input.int(5,             "Open Smoothing",      group=GROUP_CAND, minval=1, maxval=100)
+
+// -- RSI plot config
+string GROUP_PLOT   = "Config » RSI Plot"
+i_source    = input.source(ohlc4,      "Source",              group=GROUP_PLOT)
+i_lenRSI    = input.int(7,             "Length",              group=GROUP_PLOT, minval=1)
+i_mode      = input.bool(true,         "Smoothed Mode RSI?",  group=GROUP_PLOT)
+
+// -- Stochastic RSI config (kept for parity; not used in entries)
+string GROUP_STOCH  = "Config » Stochastic RSI Plot"
+i_smoothK   = input.int(3,             "Smoothing K",         group=GROUP_STOCH, minval=1)
+i_smoothD   = input.int(3,             "Smoothing D",         group=GROUP_STOCH, minval=1)
+i_stochLen  = input.int(14,            "Stochastic Length",   group=GROUP_STOCH, minval=1)
+i_stochFit  = input.int(80,            "Stoch Scaling %",     group=GROUP_STOCH, minval=1, maxval=100)
+
+// -- Channel OB/OS config
+string GROUP_CHAN   = "Config » OB/OS Boundaries"
+i_upper     = input.int(20,            "OB",                  group=GROUP_CHAN, minval=1,   maxval=50)
+i_lower     = input.int(-20,           "OS",                  group=GROUP_CHAN, minval=-50, maxval=-1)
+
+////////////////////////////////////////////////////////////////////////////////
+//                          ====== FUNCTIONS ======
+////////////////////////////////////////////////////////////////////////////////
+
+// Zero median RSI: subtracts 50 from standard Wilder RSI
+f_zrsi(float _source, int _length) =>
+    ta.rsi(_source, _length) - 50
+
+// Zero median stoch with % scaling (parity only — unused in entries)
+f_zstoch(float _source, int _length, int _smooth, int _scale) =>
+    float _zstoch   = ta.stoch(_source, _source, _source, _length) - 50
+    float _smoothed = ta.sma(_zstoch, _smooth)
+    float _scaled   = (_smoothed / 100) * _scale
+    _scaled
+
+// Mode-selectable RSI: standard zero-median OR recursively smoothed
+f_rsi(float _source, int _length, bool _mode) =>
+    float _zrsi     = f_zrsi(_source, _length)
+    var float _smoothed = na
+    _smoothed      := na(_smoothed[1]) ? _zrsi : (_smoothed[1] + _zrsi) / 2
+    _mode ? _smoothed : _zrsi
+
+////////////////////////////////////////////////////////////////////////////////
+//                   ====== SERIES ======
+////////////////////////////////////////////////////////////////////////////////
+
+float RSI       = f_rsi(i_source, i_lenRSI, i_mode)
+float StochK    = f_zstoch(RSI, i_stochLen, i_smoothK, i_stochFit)
+float StochD    = ta.sma(StochK, i_smoothD)
+
+////////////////////////////////////////////////////////////////////////////////
+//                   ====== ENTRY / EXIT LOGIC ======
+////////////////////////////////////////////////////////////////////////////////
+
+longCond  = ta.crossover(RSI,  i_lower) and barstate.isconfirmed
+shortCond = ta.crossunder(RSI, i_upper) and barstate.isconfirmed
+
+if longCond
+    strategy.entry("Long",  strategy.long)
+
+if shortCond
+    strategy.entry("Short", strategy.short)
+
+////////////////////////////////////////////////////////////////////////////////
+//                   ====== PLOTS ======
+////////////////////////////////////////////////////////////////////////////////
+
+hline(i_upper, "OB",     color.new(color.silver, 80))
+hline(0,       "Median", color.orange, hline.style_dotted)
+hline(i_lower, "OS",     color.new(color.silver, 80))
+
+plot(RSI, "RSI", color.rgb(250, 200, 50), 2)
+
+plotshape(longCond  ? RSI : na, "Long",  shape.triangleup,   location.absolute, color.lime, size=size.small)
+plotshape(shortCond ? RSI : na, "Short", shape.triangledown, location.absolute, color.red,  size=size.small)

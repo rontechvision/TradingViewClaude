@@ -9,11 +9,25 @@ You execute backtests of Python-translated PineScript strategies against histori
 
 ## Responsibilities
 
-- Load OHLCV data from `data/csv/`
+- Load OHLCV data from `data/{SYMBOL}/`
 - Instantiate the requested strategy from `src/strategies/`
 - Run the bar-by-bar backtest engine in `src/backtest/engine.py`
 - Compute and display performance metrics
 - Save full results to `results/{strategy}_{symbol}_{interval}_{timestamp}.json`
+
+## Indicator Input Handling
+
+If the input `.pine` file is an **indicator** (`indicator(...)` declaration, typically under `pinescripts/indicators/`) rather than a **strategy** (`strategy(...)` declaration under `pinescripts/strategies/`), you must first convert it to a strategy before backtesting:
+
+1. Detect indicator: file contains `indicator(` at the top-level declaration
+2. Convert to strategy:
+   - Replace `indicator(...)` with `strategy(...)` — preserve title, add standard strategy args (`overlay`, `default_qty_type = strategy.percent_of_equity`, `default_qty_value = 100`, `commission_type = strategy.commission.percent`, `commission_value = 0.05`, `initial_capital = 10000`)
+   - Identify the indicator's entry/exit signal logic (e.g. crossovers, threshold breaks, regime flips)
+   - Add `strategy.entry("Long", strategy.long)` / `strategy.entry("Short", strategy.short)` calls on those signals
+   - Add `strategy.close()` on opposite signals, or let `strategy.entry` auto-reverse
+   - Save the converted file to `pinescripts/strategies/{original_name}_strategy.pine`
+3. Then delegate the translation to the `strategy-translator` agent and proceed with the normal backtest flow
+4. In the final report, note that the input was an indicator that was auto-converted to a strategy
 
 ## Bar-by-Bar Rule
 

@@ -11,6 +11,7 @@ from src.backtest.engine import run_backtest
 
 STRATEGY_MAP = {
     "supertrend": ("src.strategies.supertrend", "SupertrendStrategy"),
+    "harsi": ("src.strategies.harsi", "HARSIStrategy"),
 }
 
 
